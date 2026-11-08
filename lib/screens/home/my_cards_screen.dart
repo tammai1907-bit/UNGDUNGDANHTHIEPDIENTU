@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/card_provider.dart';
 import '../../models/business_card_model.dart';
@@ -7,6 +7,7 @@ import '../../widgets/qr_display_dialog.dart';
 import '../../widgets/nfc_sheet.dart';
 import 'card_builder_screen.dart';
 import 'card_detail_screen.dart';
+import '../../features/card_design/presentation/screens/my_cards_screen.dart' as card_design;
 
 class MyCardsScreen extends StatelessWidget {
   const MyCardsScreen({super.key});
@@ -41,6 +42,16 @@ class MyCardsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Danh Thiếp Của Tôi'),
         actions: [
+          IconButton(
+            tooltip: 'Phân hệ Thiết kế & Quản lý Danh thiếp (Thành viên 2)',
+            icon: const Icon(Icons.palette_outlined, color: Color(0xFF1E88E5), size: 26),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const card_design.MyCardsScreen()),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Tạo danh thiếp mới',
             icon: const Icon(Icons.add_circle_outline, color: Color(0xFF2563EB), size: 28),

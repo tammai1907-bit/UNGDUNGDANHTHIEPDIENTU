@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import 'package:provider/provider.dart';
 import 'config/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -19,13 +20,15 @@ void main() async {
   );
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => CardProvider()),
-        ChangeNotifierProvider(create: (_) => WalletProvider()),
-      ],
-      child: const DigitalBusinessCardApp(),
+    riverpod.ProviderScope(
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider(create: (_) => CardProvider()),
+          ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ],
+        child: const DigitalBusinessCardApp(),
+      ),
     ),
   );
 }
