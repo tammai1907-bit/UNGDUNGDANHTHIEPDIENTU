@@ -8,15 +8,19 @@ import 'package:digital_business_card/features/card_design/presentation/provider
 
 /// Tab 1: Nhập thông tin cá nhân & hình ảnh của danh thiếp
 class CardInfoTab extends ConsumerStatefulWidget {
-  final BusinessCard initialCard;
+  final BusinessCard? card;
 
-  const CardInfoTab({super.key, required this.initialCard});
+  const CardInfoTab({super.key, this.card});
 
   @override
   ConsumerState<CardInfoTab> createState() => _CardInfoTabState();
 }
 
-class _CardInfoTabState extends ConsumerState<CardInfoTab> {
+class _CardInfoTabState extends ConsumerState<CardInfoTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late TextEditingController _cardNameController;
   late TextEditingController _fullNameController;
   late TextEditingController _jobTitleController;
@@ -30,7 +34,7 @@ class _CardInfoTabState extends ConsumerState<CardInfoTab> {
   @override
   void initState() {
     super.initState();
-    final c = widget.initialCard;
+    final c = ref.read(cardEditorControllerProvider(widget.card)).card;
     _cardNameController = TextEditingController(text: c.cardName);
     _fullNameController = TextEditingController(text: c.fullName);
     _jobTitleController = TextEditingController(text: c.jobTitle);
@@ -57,7 +61,7 @@ class _CardInfoTabState extends ConsumerState<CardInfoTab> {
   }
 
   void _onFieldChanged() {
-    ref.read(cardEditorControllerProvider(widget.initialCard).notifier).updateBasicInfo(
+    ref.read(cardEditorControllerProvider(widget.card).notifier).updateBasicInfo(
           cardName: _cardNameController.text.trim(),
           fullName: _fullNameController.text.trim(),
           jobTitle: _jobTitleController.text.trim(),
@@ -72,9 +76,10 @@ class _CardInfoTabState extends ConsumerState<CardInfoTab> {
 
   @override
   Widget build(BuildContext context) {
-    final editorState = ref.watch(cardEditorControllerProvider(widget.initialCard));
+    super.build(context);
+    final editorState = ref.watch(cardEditorControllerProvider(widget.card));
     final card = editorState.card;
-    final controller = ref.read(cardEditorControllerProvider(widget.initialCard).notifier);
+    final controller = ref.read(cardEditorControllerProvider(widget.card).notifier);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),

@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/business_card_model.dart';
 import '../config/app_constants.dart';
+import '../features/card_design/presentation/widgets/templates/template_registry.dart';
+import '../features/card_design/data/models/card_sync_mapper.dart';
 
 class BusinessCardView extends StatelessWidget {
   final BusinessCardModel card;
@@ -17,17 +21,29 @@ class BusinessCardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (card.template) {
-      case CardTemplateType.minimalist:
-        return _buildMinimalistCard(context);
-      case CardTemplateType.elegant:
-        return _buildElegantCard(context);
-      case CardTemplateType.tech:
-        return _buildTechCard(context);
-      case CardTemplateType.creative:
-        return _buildCreativeCard(context);
-      case CardTemplateType.modern:
-        return _buildModernCard(context);
+    if (card.template == CardTemplateType.tech) {
+      return _buildTechCard(context);
+    }
+
+    try {
+      final domainCard = CardSyncMapper.toDomain(card);
+      return TemplateRegistry.buildCard(
+        card: domainCard,
+        isInteractive: isInteractive,
+      );
+    } catch (_) {
+      switch (card.template) {
+        case CardTemplateType.minimalist:
+          return _buildMinimalistCard(context);
+        case CardTemplateType.elegant:
+          return _buildElegantCard(context);
+        case CardTemplateType.tech:
+          return _buildTechCard(context);
+        case CardTemplateType.creative:
+          return _buildCreativeCard(context);
+        case CardTemplateType.modern:
+          return _buildModernCard(context);
+      }
     }
   }
 
@@ -592,6 +608,20 @@ class BusinessCardView extends StatelessWidget {
 
   // ================= HELPER WIDGETS ================= //
   Widget _buildAvatar({required double radius, BoxBorder? border}) {
+    ImageProvider? imageProvider;
+    final url = card.avatarUrl;
+    if (url != null && url.isNotEmpty) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        imageProvider = CachedNetworkImageProvider(url);
+      } else {
+        final filePath = url.startsWith('file://') ? Uri.parse(url).toFilePath() : url;
+        final file = File(filePath);
+        if (file.existsSync()) {
+          imageProvider = FileImage(file);
+        }
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -600,10 +630,8 @@ class BusinessCardView extends StatelessWidget {
       child: CircleAvatar(
         radius: radius,
         backgroundColor: Colors.white.withValues(alpha: 0.25),
-        backgroundImage: (card.avatarUrl != null && card.avatarUrl!.isNotEmpty)
-            ? NetworkImage(card.avatarUrl!)
-            : null,
-        child: (card.avatarUrl == null || card.avatarUrl!.isEmpty)
+        backgroundImage: imageProvider,
+        child: imageProvider == null
             ? Text(
                 _getAvatarInitial(card.fullName),
                 style: TextStyle(

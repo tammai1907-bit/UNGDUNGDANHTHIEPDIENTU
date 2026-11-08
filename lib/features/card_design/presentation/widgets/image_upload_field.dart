@@ -22,6 +22,20 @@ class ImageUploadField extends StatelessWidget {
     this.onImageRemoved,
   });
 
+  Future<void> _pickDirect(BuildContext context, ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      imageQuality: 90,
+    );
+
+    if (pickedFile != null) {
+      onImageSelected(pickedFile.path);
+    }
+  }
+
   Future<void> _pickAndCrop(BuildContext context, ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
@@ -86,11 +100,21 @@ class ImageUploadField extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF1E88E5)),
-                  title: const Text('Chọn từ Thư viện ảnh'),
+                  leading: const Icon(Icons.crop_rounded, color: Color(0xFF1E88E5)),
+                  title: const Text('Chọn từ Thư viện & Cắt chuẩn (1:1 / 16:9)'),
+                  subtitle: const Text('Điều chỉnh góc và tỷ lệ ảnh chuẩn'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _pickAndCrop(context, ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: Colors.green),
+                  title: const Text('Chọn từ Thư viện (Dùng ảnh gốc)'),
+                  subtitle: const Text('Dùng ngay không qua bước cắt ảnh'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickDirect(context, ImageSource.gallery);
                   },
                 ),
                 ListTile(
