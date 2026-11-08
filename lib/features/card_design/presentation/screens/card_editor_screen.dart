@@ -99,18 +99,18 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen>
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.check, size: 18),
-                label: Text(isSaving ? 'Đang lưu...' : 'Lưu'),
+                label: const Text('Lưu'),
               ),
             ),
           ],
         ),
         body: LayoutBuilder(
           builder: (context, constraints) {
-            // Màn hình rộng (Tablet / Web) chia 2 cột
-            if (constraints.maxWidth >= 850) {
+            // Màn hình rộng (tablet hoặc ngang): hiển thị 2 cột
+            if (constraints.maxWidth >= 768) {
               return _buildWideLayout(editorState);
             }
-            // Màn hình điện thoại: Preview ghim phía trên + Tab phía dưới
+            // Điện thoại: hiển thị preview ghim phía trên + tab bên dưới
             return _buildMobileLayout(editorState);
           },
         ),
@@ -137,19 +137,24 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF1E88E5)),
-                      SizedBox(width: 6),
-                      Text(
-                        'Xem trước thời gian thực (Live Preview)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E88E5),
+                  const Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF1E88E5)),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Xem trước thời gian thực (Live Preview)',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E88E5),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   if (state.isDirty)
                     Container(
@@ -198,9 +203,9 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              CardInfoTab(initialCard: state.initialCard),
-              CardDesignTab(initialCard: state.initialCard),
-              CardSocialsTab(initialCard: state.initialCard),
+              CardInfoTab(card: widget.card),
+              CardDesignTab(card: widget.card),
+              CardSocialsTab(card: widget.card),
             ],
           ),
         ),
@@ -232,9 +237,9 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    CardInfoTab(initialCard: state.initialCard),
-                    CardDesignTab(initialCard: state.initialCard),
-                    CardSocialsTab(initialCard: state.initialCard),
+                    CardInfoTab(card: widget.card),
+                    CardDesignTab(card: widget.card),
+                    CardSocialsTab(card: widget.card),
                   ],
                 ),
               ),
@@ -258,12 +263,14 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen>
                     children: [
                       Icon(Icons.remove_red_eye_outlined, color: Color(0xFF1E88E5)),
                       SizedBox(width: 8),
-                      Text(
-                        'Xem trước theo thời gian thực (Live Preview)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E88E5),
+                      Expanded(
+                        child: Text(
+                          'Xem trước theo thời gian thực (Live Preview)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E88E5),
+                          ),
                         ),
                       ),
                     ],

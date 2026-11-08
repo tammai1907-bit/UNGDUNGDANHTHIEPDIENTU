@@ -8,7 +8,8 @@ import '../../widgets/qr_display_dialog.dart';
 import '../../widgets/virtual_bg_dialog.dart';
 import '../../widgets/nfc_sheet.dart';
 import '../../services/share_service.dart';
-import 'card_builder_screen.dart';
+import '../../features/card_design/presentation/screens/card_editor_screen.dart';
+import '../../features/card_design/data/models/card_sync_mapper.dart';
 
 class CardDetailScreen extends StatefulWidget {
   final BusinessCardModel card;
@@ -75,11 +76,8 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => CardBuilderScreen(existingCard: currentCard)),
-              );
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => CardEditorScreen(card: CardSyncMapper.toDomain(currentCard)))); if (mounted) { cardProvider.loadMyCards(); }
             },
           ),
           IconButton(

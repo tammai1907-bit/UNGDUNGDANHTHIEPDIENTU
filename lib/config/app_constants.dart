@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 enum CardTemplateType {
@@ -102,10 +103,70 @@ class AppConstants {
     },
   ];
 
+  static Color _parseHexColor(String hex) {
+    String cleanHex = hex.replaceAll('#', '').trim();
+    if (cleanHex.length == 6) {
+      cleanHex = 'FF$cleanHex';
+    }
+    return Color(int.parse(cleanHex, radix: 16));
+  }
+
+  static Color _generateSecondaryColor(Color primary) {
+    final hsl = HSLColor.fromColor(primary);
+    final newHue = (hsl.hue + 25) % 360;
+    final newLightness = (hsl.lightness > 0.5) ? hsl.lightness - 0.15 : hsl.lightness + 0.15;
+    return hsl.withHue(newHue).withLightness(newLightness.clamp(0.0, 1.0)).toColor();
+  }
+
   static Map<String, dynamic> getThemeColorById(String id) {
-    return themeColors.firstWhere(
-      (theme) => theme['id'] == id,
-      orElse: () => themeColors[0],
-    );
+    // 1. Kiểm tra ID màu có sẵn (navy_blue, emerald, ...)
+    final found = themeColors.where((theme) => theme['id'] == id);
+    if (found.isNotEmpty) {
+      return found.first;
+    }
+
+    // 2. Nếu id là JSON cấu hình thiết kế từ Member 2 (chứa primary, secondary, text...)
+    if (id.startsWith('{')) {
+      try {
+        final map = jsonDecode(id) as Map<String, dynamic>;
+        final p = _parseHexColor(map['primary'] as String? ?? '#1E3A8A');
+        final s = map['secondary'] != null
+            ? _parseHexColor(map['secondary'] as String)
+            : _generateSecondaryColor(p);
+        final textColor = map['text'] != null
+            ? _parseHexColor(map['text'] as String)
+            : (ThemeData.estimateBrightnessForColor(p) == Brightness.dark ? Colors.white : const Color(0xFF0F172A));
+        return {
+          'id': id,
+          'name': 'Màu tùy chỉnh',
+          'primary': p,
+          'secondary': s,
+          'textColor': textColor,
+        };
+      } catch (_) {}
+    }
+
+    // 3. Nếu id là mã HEX đơn hoặc cặp HEX (vd: "#8BC34A" hoặc "#8BC34A_#3B82F6")
+    if (id.startsWith('#')) {
+      try {
+        final parts = id.split('_');
+        final primaryColor = _parseHexColor(parts[0]);
+        final secondaryColor = parts.length > 1
+            ? _parseHexColor(parts[1])
+            : _generateSecondaryColor(primaryColor);
+
+        return {
+          'id': id,
+          'name': 'Màu tùy chỉnh',
+          'primary': primaryColor,
+          'secondary': secondaryColor,
+          'textColor': ThemeData.estimateBrightnessForColor(primaryColor) == Brightness.dark
+              ? Colors.white
+              : const Color(0xFF0F172A),
+        };
+      } catch (_) {}
+    }
+
+    return themeColors[0];
   }
 }

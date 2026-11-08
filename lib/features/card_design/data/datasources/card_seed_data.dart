@@ -8,9 +8,9 @@ class CardSeedData {
     final now = DateTime.now();
 
     return [
-      // Thẻ 1: Công việc chính thức
+      // Thẻ 1: Công việc chính thức (ID trùng với SQLite để đồng bộ hiển thị)
       BusinessCard(
-        id: 'card_official_tam',
+        id: 'card_official_01',
         ownerId: ownerId,
         cardName: 'Công Việc Chính Thức',
         fullName: 'Mai Văn Tâm',
@@ -82,7 +82,7 @@ class CardSeedData {
 
       // Thẻ 2: Dự án Freelance & Tư Vấn
       BusinessCard(
-        id: 'card_freelance_tam',
+        id: 'card_freelance_02',
         ownerId: ownerId,
         cardName: 'Dự Án Freelance & Tư Vấn',
         fullName: 'Tâm Mai (Kevin)',

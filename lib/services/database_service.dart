@@ -277,12 +277,7 @@ class DatabaseService {
     if (card.isDefault) {
       await db.update('profiles', {'isDefault': 0});
     }
-    return await db.update(
-      'profiles',
-      card.toMap(),
-      where: 'id = ?',
-      whereArgs: [card.id],
-    );
+    final count = await db.update('profiles', card.toMap(), where: 'id = ?', whereArgs: [card.id]); if (count == 0) { await db.insert('profiles', card.toMap()); return 1; } return count;
   }
 
   Future<int> deleteProfile(String id) async {

@@ -8,16 +8,16 @@ import 'package:digital_business_card/features/card_design/presentation/widgets/
 
 /// Tab 2: Tùy biến giao diện (Template, Màu sắc, Phông chữ, Bo góc)
 class CardDesignTab extends ConsumerWidget {
-  final BusinessCard initialCard;
+  final BusinessCard? card;
 
-  const CardDesignTab({super.key, required this.initialCard});
+  const CardDesignTab({super.key, this.card});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final editorState = ref.watch(cardEditorControllerProvider(initialCard));
-    final card = editorState.card;
-    final d = card.design;
-    final controller = ref.read(cardEditorControllerProvider(initialCard).notifier);
+    final editorState = ref.watch(cardEditorControllerProvider(card));
+    final currentCard = editorState.card;
+    final d = currentCard.design;
+    final controller = ref.read(cardEditorControllerProvider(card).notifier);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),

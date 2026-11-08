@@ -7,16 +7,16 @@ import 'package:digital_business_card/features/card_design/presentation/widgets/
 
 /// Tab 3: Quản lý và sắp xếp các liên kết mạng xã hội (Social Links)
 class CardSocialsTab extends ConsumerWidget {
-  final BusinessCard initialCard;
+  final BusinessCard? card;
 
-  const CardSocialsTab({super.key, required this.initialCard});
+  const CardSocialsTab({super.key, this.card});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final editorState = ref.watch(cardEditorControllerProvider(initialCard));
-    final card = editorState.card;
-    final links = card.socialLinks;
-    final controller = ref.read(cardEditorControllerProvider(initialCard).notifier);
+    final editorState = ref.watch(cardEditorControllerProvider(card));
+    final currentCard = editorState.card;
+    final links = currentCard.socialLinks;
+    final controller = ref.read(cardEditorControllerProvider(card).notifier);
 
     return Column(
       children: [

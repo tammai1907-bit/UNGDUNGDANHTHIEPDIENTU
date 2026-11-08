@@ -54,7 +54,7 @@ void main() {
     test('Duplicate card duplicates correctly', () async {
       final dupRes = await repo.duplicateCard(
         userId: testUserId,
-        cardId: 'card_official_tam',
+        cardId: 'card_official_01',
         newId: 'cloned_id',
       );
 
@@ -66,13 +66,13 @@ void main() {
     test('Set default card updates correctly', () async {
       final res = await repo.setDefaultCard(
         userId: testUserId,
-        cardId: 'card_freelance_tam',
+        cardId: 'card_freelance_02',
       );
       expect(res.isSuccess, isTrue);
 
       final list = (await repo.getCards(testUserId)).dataOrNull!;
-      final freelance = list.firstWhere((c) => c.id == 'card_freelance_tam');
-      final official = list.firstWhere((c) => c.id == 'card_official_tam');
+      final freelance = list.firstWhere((c) => c.id == 'card_freelance_02');
+      final official = list.firstWhere((c) => c.id == 'card_official_01');
 
       expect(freelance.isDefault, isTrue);
       expect(official.isDefault, isFalse);
@@ -81,7 +81,7 @@ void main() {
     test('Delete card removes it and updates default if needed', () async {
       final delRes = await repo.deleteCard(
         userId: testUserId,
-        cardId: 'card_official_tam',
+        cardId: 'card_official_01',
       );
       expect(delRes.isSuccess, isTrue);
 

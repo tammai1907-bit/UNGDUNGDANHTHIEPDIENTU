@@ -222,6 +222,25 @@ class CardEditorController extends StateNotifier<CardEditorState> {
 
   /// Lưu danh thiếp (Upload ảnh nếu có, ghi Firestore hoặc FakeRepo)
   Future<bool> saveCard() async {
+    final trimmedName = state.card.fullName.trim();
+    final trimmedCardName = state.card.cardName.trim();
+
+    if (trimmedCardName.isEmpty) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'Vui lòng nhập Tên danh thiếp',
+      );
+      return false;
+    }
+
+    if (trimmedName.isEmpty) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'Vui lòng nhập Họ và tên đầy đủ',
+      );
+      return false;
+    }
+
     state = state.copyWith(isSaving: true, clearError: true);
 
     final cardRepo = _ref.read(cardRepositoryProvider);

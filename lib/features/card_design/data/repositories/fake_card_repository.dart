@@ -1,11 +1,14 @@
 import 'dart:async';
 import '../../../../core/constants/card_constants.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../services/database_service.dart';
 import '../../domain/entities/business_card.dart';
 import '../../domain/repositories/card_repository.dart';
 import '../datasources/card_seed_data.dart';
+import '../models/card_sync_mapper.dart';
 
 /// Bản cài đặt Fake InMemory của CardRepository để chạy độc lập không phụ thuộc Firebase
+/// Tự động đồng bộ với SQLite DatabaseService để các màn hình khác trong app phản ánh ngay thay đổi.
 class FakeCardRepository implements CardRepository {
   final Map<String, List<BusinessCard>> _storage = {};
   final Map<String, StreamController<List<BusinessCard>>> _controllers = {};
@@ -25,6 +28,15 @@ class FakeCardRepository implements CardRepository {
   void _ensureInitialized(String userId) {
     if (!_storage.containsKey(userId)) {
       _storage[userId] = CardSeedData.getInitialCards(userId);
+      // Tự động nạp dữ liệu từ SQLite nếu có sẵn
+      try {
+        DatabaseService.instance.getAllProfiles().then((profiles) {
+          if (profiles.isNotEmpty) {
+            _storage[userId] = profiles.map(CardSyncMapper.toDomain).toList();
+            _notify(userId);
+          }
+        }).catchError((_) {});
+      } catch (_) {}
     }
   }
 
@@ -39,7 +51,7 @@ class FakeCardRepository implements CardRepository {
   @override
   Future<Result<List<BusinessCard>>> getCards(String userId) async {
     _ensureInitialized(userId);
-    await Future.delayed(const Duration(milliseconds: 150));
+    await Future.delayed(const Duration(milliseconds: 100));
     return Result.success(List.unmodifiable(_storage[userId] ?? []));
   }
 
@@ -78,6 +90,12 @@ class FakeCardRepository implements CardRepository {
 
     userCards.add(card);
     _notify(card.ownerId);
+
+    // Đồng bộ vào SQLite
+    try {
+      await DatabaseService.instance.insertProfile(CardSyncMapper.toModel(card));
+    } catch (_) {}
+
     return Result.success(null);
   }
 
@@ -101,6 +119,12 @@ class FakeCardRepository implements CardRepository {
 
     userCards[index] = card.copyWith(updatedAt: DateTime.now());
     _notify(card.ownerId);
+
+    // Đồng bộ vào SQLite
+    try {
+      await DatabaseService.instance.updateProfile(CardSyncMapper.toModel(card));
+    } catch (_) {}
+
     return Result.success(null);
   }
 
@@ -126,6 +150,12 @@ class FakeCardRepository implements CardRepository {
     }
 
     _notify(userId);
+
+    // Đồng bộ vào SQLite
+    try {
+      await DatabaseService.instance.deleteProfile(cardId);
+    } catch (_) {}
+
     return Result.success(null);
   }
 
@@ -160,6 +190,12 @@ class FakeCardRepository implements CardRepository {
 
     userCards.add(clonedCard);
     _notify(userId);
+
+    // Đồng bộ vào SQLite
+    try {
+      await DatabaseService.instance.insertProfile(CardSyncMapper.toModel(clonedCard));
+    } catch (_) {}
+
     return Result.success(clonedCard);
   }
 
@@ -186,6 +222,12 @@ class FakeCardRepository implements CardRepository {
     }
 
     _notify(userId);
+
+    // Đồng bộ vào SQLite
+    try {
+      await DatabaseService.instance.setDefaultProfile(cardId);
+    } catch (_) {}
+
     return Result.success(null);
   }
 }

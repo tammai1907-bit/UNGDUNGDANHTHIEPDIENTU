@@ -18,10 +18,17 @@ class CardProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    final previousActiveId = _activeCard?.id;
     _myCards = await DatabaseService.instance.getAllProfiles();
     if (_myCards.isNotEmpty) {
-      // Chọn thẻ mặc định hoặc thẻ đầu tiên
-      _activeCard = _myCards.firstWhere((c) => c.isDefault, orElse: () => _myCards.first);
+      if (previousActiveId != null) {
+        _activeCard = _myCards.firstWhere(
+          (c) => c.id == previousActiveId,
+          orElse: () => _myCards.firstWhere((c) => c.isDefault, orElse: () => _myCards.first),
+        );
+      } else {
+        _activeCard = _myCards.firstWhere((c) => c.isDefault, orElse: () => _myCards.first);
+      }
       await loadAnalyticsForCard(_activeCard!.id);
     } else {
       _activeCard = null;
