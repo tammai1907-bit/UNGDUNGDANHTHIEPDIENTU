@@ -122,7 +122,7 @@ class DatabaseService {
       jobTitle: 'Kỹ sư Phần mềm Cấp cao (Senior Mobile Engineer)',
       company: 'Tập đoàn Công nghệ TechCorp VN',
       phone: '0987654321',
-      email: 'tam.mai@techcorp.vn',
+      email: 'tammai1907@gmail.com',
       website: 'https://techcorp.vn',
       address: 'Tầng 12, Tòa nhà Innovation, Quận 1, TP. Hồ Chí Minh',
       bio: 'Chuyên gia phát triển ứng dụng di động Flutter & iOS Native với hơn 5 năm kinh nghiệm.',

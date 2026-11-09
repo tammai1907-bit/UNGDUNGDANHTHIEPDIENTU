@@ -18,7 +18,7 @@ class CardSeedData {
         company: 'Tập đoàn Công nghệ TechCorp VN',
         bio: 'Chuyên gia phát triển ứng dụng di động Flutter & iOS Native với hơn 5 năm kinh nghiệm thực chiến.',
         phone: '0987654321',
-        email: 'tam.mai@techcorp.vn',
+        email: 'tammai1907@gmail.com',
         website: 'https://techcorp.vn',
         address: 'Tầng 12, Tòa nhà Innovation, Quận 1, TP. Hồ Chí Minh',
         avatarUrl: null, // Sẽ hiển thị Avatar chữ cái hoặc placeholder
@@ -45,7 +45,7 @@ class CardSeedData {
           SocialLink(
             id: 'link_email_1',
             type: SocialLinkType.email,
-            value: 'tam.mai@techcorp.vn',
+            value: 'tammai1907@gmail.com',
             label: 'Email',
             order: 1,
             isVisible: true,
