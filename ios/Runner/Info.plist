@@ -66,5 +66,17 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- Permissions for Camera, NFC, Contacts, Photo Library, Biometrics -->
+	<key>NSCameraUsageDescription</key>
+	<string>Ứng dụng cần quyền Camera để quét mã QR và chụp ảnh danh thiếp.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>Ứng dụng cần quyền NFC để đọc và ghi thông tin danh thiếp một chạm.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Ứng dụng cần quyền Danh bạ để lưu liên hệ trực tiếp vào điện thoại của bạn.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ứng dụng cần quyền Thư viện ảnh để tải ảnh đại diện, ảnh bìa và quét mã QR từ ảnh.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Ứng dụng cần quyền FaceID để mở khóa ứng dụng an toàn.</string>
 </dict>
 </plist>

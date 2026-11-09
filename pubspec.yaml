@@ -58,6 +58,8 @@ dependencies:
   url_launcher: ^6.3.0
   screenshot: ^3.0.0
   fl_chart: ^0.69.0
+  firebase_auth: ^5.7.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

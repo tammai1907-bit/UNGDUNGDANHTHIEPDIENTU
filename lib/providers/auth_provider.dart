@@ -32,7 +32,7 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = await AuthService.instance.getCurrentUser() ??
           UserModel(
             id: 'usr_biometric',
-            email: 'tam.mai@techcorp.vn',
+            email: 'tammai1907@gmail.com',
             displayName: 'Mai Văn Tâm',
             phoneNumber: '0987654321',
             createdAt: DateTime.now(),
@@ -56,6 +56,16 @@ class AuthProvider extends ChangeNotifier {
     }
     notifyListeners();
     return false;
+  }
+
+  Future<bool> resetPassword(String email, String newPassword) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final success = await AuthService.instance.resetPassword(email, newPassword);
+    _isLoading = false;
+    notifyListeners();
+    return success;
   }
 
   Future<bool> register(String name, String email, String password, {String? phone}) async {

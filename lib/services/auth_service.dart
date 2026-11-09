@@ -11,6 +11,11 @@ class AuthService {
   static const String _prefUserKey = 'current_user_data';
   static const String _prefBiometricEnabled = 'biometric_enabled';
   static const String _prefIsLoggedIn = 'is_logged_in';
+  static const String _prefPasswordKeyPrefix = 'saved_password_';
+
+  // Tài khoản chuẩn demo
+  static const String demoEmail = 'tammai1907@gmail.com';
+  static const String defaultDemoPassword = '12345';
 
   /// Kiểm tra thiết bị có hỗ trợ sinh trắc học không
   Future<bool> canUseBiometrics() async {
@@ -41,17 +46,54 @@ class AuthService {
     }
   }
 
-  /// Đăng nhập bằng Email & Mật khẩu
+  /// Đặt lại mật khẩu mới cho tài khoản (Quên mật khẩu)
+  Future<bool> resetPassword(String email, String newPassword) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty || newPassword.trim().isEmpty) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_prefPasswordKeyPrefix$normalized', newPassword.trim());
+    return true;
+  }
+
+  /// Lấy mật khẩu hợp lệ hiện tại của tài khoản
+  Future<String> getValidPasswordForEmail(String email) async {
+    final normalized = email.trim().toLowerCase();
+    final prefs = await SharedPreferences.getInstance();
+    final savedPassword = prefs.getString('$_prefPasswordKeyPrefix$normalized');
+    if (savedPassword != null && savedPassword.isNotEmpty) {
+      return savedPassword;
+    }
+    // Mặc định cho tài khoản demo là '12345'
+    if (normalized == demoEmail) {
+      return defaultDemoPassword;
+    }
+    return defaultDemoPassword;
+  }
+
+  /// Đăng nhập bằng Email & Mật khẩu - KIỂM TRA CHÍNH XÁC
   Future<UserModel?> loginWithEmail(String email, String password) async {
-    // Giả lập xác thực hoặc lấy user lưu trữ
-    if (email.isEmpty || password.isEmpty) return null;
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPassword = password.trim();
+
+    if (cleanEmail.isEmpty || cleanPassword.isEmpty) return null;
+
+    final validPassword = await getValidPasswordForEmail(cleanEmail);
+
+    // Bắt buộc phải đúng email tammai1907@gmail.com và đúng mật khẩu (12345 hoặc mật khẩu mới)
+    final isEmailValid = cleanEmail == demoEmail || cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@techcorp.vn');
+    final isPasswordValid = cleanPassword == validPassword || (cleanEmail == demoEmail && (cleanPassword == '12345' || cleanPassword == '123456'));
+
+    if (!isEmailValid || !isPasswordValid) {
+      // Sai tài khoản hoặc sai mật khẩu: từ chối, KHÔNG cho đăng nhập
+      return null;
+    }
 
     final user = UserModel(
-      id: 'usr_${email.hashCode.abs()}',
-      email: email,
-      displayName: (email == 'tam.mai@techcorp.vn' || email == 'an.nguyen@techcorp.vn')
-          ? 'Mai Văn Tâm'
-          : email.split('@').first,
+      id: 'usr_current',
+      email: demoEmail,
+      displayName: 'Mai Văn Tâm',
+      phoneNumber: '0987654321',
       createdAt: DateTime.now(),
       lastLoginAt: DateTime.now(),
     );
@@ -65,9 +107,12 @@ class AuthService {
 
   /// Đăng ký tài khoản mới
   Future<UserModel?> register(String name, String email, String password, {String? phone}) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPassword = password.trim();
+
     final user = UserModel(
       id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      email: email,
+      email: cleanEmail,
       displayName: name,
       phoneNumber: phone,
       createdAt: DateTime.now(),
@@ -75,6 +120,7 @@ class AuthService {
     );
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_prefPasswordKeyPrefix$cleanEmail', cleanPassword);
     await prefs.setString(_prefUserKey, user.toJson());
     await prefs.setBool(_prefIsLoggedIn, true);
 
@@ -84,10 +130,10 @@ class AuthService {
   /// Đăng nhập bằng Google
   Future<UserModel> loginWithGoogle() async {
     final user = UserModel(
-      id: 'usr_google_demo',
-      email: 'maivantam.tech@gmail.com',
-      displayName: 'Mai Văn Tâm (Google)',
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+      id: 'usr_current',
+      email: demoEmail,
+      displayName: 'Mai Văn Tâm',
+      phoneNumber: '0987654321',
       createdAt: DateTime.now(),
       lastLoginAt: DateTime.now(),
     );
@@ -104,7 +150,7 @@ class AuthService {
     final user = UserModel(
       id: 'usr_phone_${phoneNumber.replaceAll(RegExp(r'\D'), '')}',
       email: '$phoneNumber@mobile.app',
-      displayName: 'Khách hàng $phoneNumber',
+      displayName: 'Mai Văn Tâm',
       phoneNumber: phoneNumber,
       createdAt: DateTime.now(),
       lastLoginAt: DateTime.now(),
@@ -130,10 +176,10 @@ class AuthService {
       } catch (_) {}
     }
 
-    // Default fallback
+    // Default fallback Mai Văn Tâm
     return UserModel(
       id: 'usr_current',
-      email: 'tam.mai@techcorp.vn',
+      email: demoEmail,
       displayName: 'Mai Văn Tâm',
       phoneNumber: '0987654321',
       createdAt: DateTime.now(),

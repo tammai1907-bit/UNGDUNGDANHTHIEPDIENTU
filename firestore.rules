@@ -1,17 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Phân hệ Quản lý Danh thiếp (Digital Business Card - Thành viên 2)
-    match /users/{userId}/cards/{cardId} {
-      // Chỉ chủ sở hữu tài khoản mới được đọc và ghi danh thiếp của mình
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Giới hạn dữ liệu hợp lệ khi tạo mới hoặc cập nhật
-      allow create, update: if request.auth != null 
-        && request.auth.uid == userId
-        && request.resource.data.cardName is string
-        && request.resource.data.fullName is string
-        && request.resource.data.company is string;
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+
+      // Quản lý Danh thiếp (Phân hệ card_design)
+      match /cards/{cardId} {
+        allow read: if isOwner(userId) || resource.data.isDefault == true;
+        allow write: if isOwner(userId);
+      }
+
+      // Ví danh bạ (Phân hệ contacts)
+      match /contacts/{contactId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Cài đặt cá nhân (Phân hệ settings)
+      match /settings/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Thống kê & Phân tích tương tác (Phân hệ analytics)
+    match /cards/{cardId}/analytics/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if true;
+    }
+
+    match /cards/{cardId}/events/{eventId} {
+      allow create: if true;
+      allow read: if isAuthenticated();
     }
   }
 }

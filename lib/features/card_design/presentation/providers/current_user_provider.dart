@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 
 /// Provider cung cấp userId hiện tại.
-/// Mặc định trả về 'demo_user' (Mai Văn Tâm) để dễ dàng ghép nối với module Auth của thành viên khác.
+/// Tự động liên kết với người dùng đang đăng nhập từ Phân hệ Auth, fallback về 'user_current'.
 final currentUserIdProvider = Provider<String>((ref) {
-  return 'user_current';
+  final user = ref.watch(currentUserProfileProvider);
+  return user?.id ?? 'user_current';
 });
