@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:digital_business_card/features/sharing/utils/qr_link_parser.dart';
 
-class QrScannerScreen extends StatefulWidget {
+import 'package:digital_business_card/features/sharing/utils/qr_link_parser.dart';
+import 'package:digital_business_card/features/contacts/domain/entities/saved_contact.dart';
+import 'package:digital_business_card/features/contacts/presentation/providers/contact_providers.dart';
+
+class QrScannerScreen extends ConsumerStatefulWidget {
   const QrScannerScreen({super.key});
 
   @override
-  State<QrScannerScreen> createState() => _QrScannerScreenState();
+  ConsumerState<QrScannerScreen> createState() => _QrScannerScreenState();
 }
 
-class _QrScannerScreenState extends State<QrScannerScreen> {
+class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
@@ -47,31 +51,137 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     final cardInfo = QrLinkParser.parse(rawValue);
 
     if (cardInfo != null) {
-      // Mở màn hình danh thiếp công khai
-      context.push(
-        '/public-card?ownerId=${cardInfo.ownerId}&cardId=${cardInfo.cardId}',
-      ).then((_) {
-        if (mounted) setState(() => _isProcessing = false);
-      });
-    } else {
-      // Không phải link định dạng thẻ danh thiếp
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Mã QR đã quét'),
-          content: Text('Nội dung quét được:\n\n$rawValue'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                setState(() => _isProcessing = false);
-              },
-              child: const Text('Tiếp tục quét'),
+      // 1. Mở màn hình danh thiếp công khai của Thành viên 3 kèm tham số source=qr
+      context
+          .push(
+            '/public-card?ownerId=${cardInfo.ownerId}&cardId=${cardInfo.cardId}&source=qr',
+          )
+          .then((_) {
+            if (mounted) setState(() => _isProcessing = false);
+          });
+      return;
+    }
+
+    // 2. Nhận diện danh thiếp định dạng vCard thô trực tiếp
+    if (rawValue.toUpperCase().contains('BEGIN:VCARD')) {
+      _handleVCardScanned(rawValue);
+      return;
+    }
+
+    // 3. Nội dung mã QR khác
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mã QR đã quét'),
+        content: Text('Nội dung quét được:\n\n$rawValue'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _isProcessing = false);
+            },
+            child: const Text('Tiếp tục quét'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleVCardScanned(String vcardText) {
+    final parsedContact = SavedContact.fromVCard(
+      vcardText,
+      source: 'Quét mã QR',
+      tags: const ['Sự kiện'],
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.contact_mail_rounded, color: Color(0xFF2563EB)),
+                SizedBox(width: 8),
+                Text(
+                  'Đã Nhận Danh Thiếp vCard!',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Họ và tên: ${parsedContact.fullName}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            if (parsedContact.jobTitle != null)
+              Text(
+                'Chức vụ: ${parsedContact.jobTitle}',
+                style: const TextStyle(color: Color(0xFF2563EB)),
+              ),
+            if (parsedContact.company != null)
+              Text(
+                'Công ty: ${parsedContact.company}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            if (parsedContact.phone != null)
+              Text('Điện thoại: ${parsedContact.phone}'),
+            if (parsedContact.email != null)
+              Text('Email: ${parsedContact.email}'),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                ),
+                icon: const Icon(Icons.bookmark_add_rounded),
+                label: const Text('Lưu Ngay Vào Ví Danh Bạ (CRM)'),
+                onPressed: () async {
+                  final result = await ref
+                      .read(contactControllerProvider.notifier)
+                      .addContact(parsedContact);
+                  if (!result.isSuccess) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Không thể lưu danh thiếp: ${result.errorOrNull}',
+                          ),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF16A34A),
+                        content: Text(
+                          'Đã lưu danh thiếp "${parsedContact.fullName}" vào Ví!',
+                        ),
+                      ),
+                    );
+                    context.go('/contacts');
+                  }
+                },
+              ),
             ),
           ],
         ),
-      );
-    }
+      ),
+    ).then((_) {
+      if (mounted) setState(() => _isProcessing = false);
+    });
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -90,14 +200,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không tìm thấy mã QR trong hình ảnh đã chọn')),
+          const SnackBar(
+            content: Text('Không tìm thấy mã QR trong hình ảnh đã chọn'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi phân tích ảnh: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lỗi khi phân tích ảnh: $e')));
       }
     }
   }
@@ -107,7 +218,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Quét Mã QR Danh Thiếp', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Quét Mã QR Danh Thiếp',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -132,10 +246,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       body: Stack(
         children: [
           // Camera scanner view
-          MobileScanner(
-            controller: _controller,
-            onDetect: _handleBarcode,
-          ),
+          MobileScanner(controller: _controller, onDetect: _handleBarcode),
 
           // Khung ngắm quét (Overlay)
           Center(
@@ -161,7 +272,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Text(
-                'Căn chỉnh mã QR của danh thiếp vào khung ngắm để tự động nhận diện',
+                'Căn chỉnh mã QR của danh thiếp đối tác vào khung ngắm để tự động nhận và lưu vào Ví',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 13),
               ),
@@ -179,11 +290,19 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.15),
                   side: const BorderSide(color: Colors.white70),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 onPressed: _pickImageFromGallery,
-                icon: const Icon(Icons.photo_library_outlined, color: Colors.white),
-                label: const Text('Chọn QR từ thư viện ảnh', style: TextStyle(color: Colors.white)),
+                icon: const Icon(
+                  Icons.photo_library_outlined,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'Chọn QR từ thư viện ảnh',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ),
           ),

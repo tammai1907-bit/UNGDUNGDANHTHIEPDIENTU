@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:digital_business_card/features/card_design/presentation/providers/card_repository_provider.dart' show useMockDataProvider;
+import 'package:digital_business_card/features/card_design/presentation/providers/card_repository_provider.dart'
+    show useMockDataProvider;
 import 'package:digital_business_card/features/card_design/presentation/providers/card_list_controller.dart';
-import 'package:digital_business_card/features/card_design/domain/entities/business_card.dart';
 import 'package:digital_business_card/features/analytics/domain/entities/card_analytics.dart';
 import 'package:digital_business_card/features/analytics/domain/repositories/analytics_repository.dart';
 import 'package:digital_business_card/features/analytics/data/repositories/fake_analytics_repository.dart';
@@ -17,27 +17,52 @@ final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
 
 final selectedAnalyticsCardIdProvider = StateProvider<String?>((ref) => null);
 
-final cardAnalyticsFutureProvider = FutureProvider<CardAnalytics>((ref) async {
+/// Stream Provider cung cấp dữ liệu phân tích thời gian thực khi có tương tác (Live Analytics)
+final cardAnalyticsStreamProvider = StreamProvider<CardAnalytics>((ref) {
   final repo = ref.watch(analyticsRepositoryProvider);
-  final List<BusinessCard> cards = await ref.watch(myCardsStreamProvider.future);
+  final cardsAsync = ref.watch(myCardsStreamProvider);
 
-  if (cards.isEmpty) {
-    return const CardAnalytics(
-      cardId: '',
-      totalViews: 0,
-      totalSaves: 0,
-      totalQrScans: 0,
-      totalNfcTaps: 0,
-      dailyStats: [],
-      linkClicks: [],
-    );
-  }
+  return cardsAsync.when(
+    data: (cards) {
+      if (cards.isEmpty) {
+        return Stream.value(
+          const CardAnalytics(
+            cardId: '',
+            totalViews: 0,
+            totalSaves: 0,
+            totalQrScans: 0,
+            totalNfcTaps: 0,
+            dailyStats: [],
+            linkClicks: [],
+          ),
+        );
+      }
 
-  final selectedId = ref.watch(selectedAnalyticsCardIdProvider);
-  final targetCard = cards.firstWhere(
-    (c) => c.id == selectedId,
-    orElse: () => cards.firstWhere((c) => c.isDefault, orElse: () => cards.first),
+      final selectedId = ref.watch(selectedAnalyticsCardIdProvider);
+      final targetCard = cards.firstWhere(
+        (c) => c.id == selectedId,
+        orElse: () =>
+            cards.firstWhere((c) => c.isDefault, orElse: () => cards.first),
+      );
+
+      return repo.watchAnalyticsForCard(targetCard.id);
+    },
+    loading: () => const Stream.empty(),
+    error: (_, __) => const Stream.empty(),
   );
+});
 
-  return repo.getAnalyticsForCard(targetCard.id);
+/// Giữ lại Provider này để tương thích hoàn toàn với các màn hình hiện có
+final cardAnalyticsFutureProvider = FutureProvider<CardAnalytics>((ref) async {
+  final stream = ref.watch(cardAnalyticsStreamProvider);
+  return stream.value ??
+      const CardAnalytics(
+        cardId: '',
+        totalViews: 0,
+        totalSaves: 0,
+        totalQrScans: 0,
+        totalNfcTaps: 0,
+        dailyStats: [],
+        linkClicks: [],
+      );
 });
