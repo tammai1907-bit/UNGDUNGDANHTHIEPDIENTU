@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../services/nfc_service.dart';
+import '../../utils/qr_link_parser.dart';
 
 class NfcExchangeScreen extends StatefulWidget {
   final String cardUrl;
@@ -15,7 +18,8 @@ class NfcExchangeScreen extends StatefulWidget {
   State<NfcExchangeScreen> createState() => _NfcExchangeScreenState();
 }
 
-class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTickerProviderStateMixin {
+class _NfcExchangeScreenState extends State<NfcExchangeScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   NfcSessionState _state = NfcSessionState.idle;
   String? _statusMessage;
@@ -136,7 +140,10 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
             children: [
               // Thông tin thẻ
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(16),
@@ -145,12 +152,18 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.credit_card_rounded, color: Color(0xFF2563EB)),
+                    const Icon(
+                      Icons.credit_card_rounded,
+                      color: Color(0xFF2563EB),
+                    ),
                     const SizedBox(width: 10),
                     Flexible(
                       child: Text(
                         widget.cardName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -167,21 +180,25 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      if (_state == NfcSessionState.waitingForTag || _state == NfcSessionState.writing)
+                      if (_state == NfcSessionState.waitingForTag ||
+                          _state == NfcSessionState.writing)
                         AnimatedBuilder(
                           animation: _animController,
                           builder: (context, child) {
                             return Stack(
                               alignment: Alignment.center,
                               children: List.generate(3, (index) {
-                                final value = (_animController.value + index / 3.0) % 1.0;
+                                final value =
+                                    (_animController.value + index / 3.0) % 1.0;
                                 return Container(
                                   width: 80 + value * 140,
                                   height: 80 + value * 140,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: statusColor.withValues(alpha: (1.0 - value) * 0.6),
+                                      color: statusColor.withValues(
+                                        alpha: (1.0 - value) * 0.6,
+                                      ),
                                       width: 3,
                                     ),
                                   ),
@@ -215,8 +232,8 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
                 _state == NfcSessionState.success
                     ? 'Ghi Thẻ Thành Công!'
                     : (_state == NfcSessionState.unsupported
-                        ? 'Chưa Có Phần Cứng NFC'
-                        : 'Sẵn Sàng Chạm Thẻ'),
+                          ? 'Chưa Có Phần Cứng NFC'
+                          : 'Sẵn Sàng Chạm Thẻ'),
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -233,14 +250,21 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
 
               // URL được ghi
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blue.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   widget.cardUrl,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontFamily: 'monospace'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF2563EB),
+                    fontFamily: 'monospace',
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -255,7 +279,9 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: _runMockSimulation,
                     icon: const Icon(Icons.play_circle_outline),
@@ -269,10 +295,37 @@ class _NfcExchangeScreenState extends State<NfcExchangeScreen> with SingleTicker
                 SizedBox(
                   width: double.infinity,
                   height: 48,
-                  child: FilledButton(
+                  child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      backgroundColor: const Color(0xFF2563EB),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Mở & Lưu Vào Ví (Chạm NFC)'),
+                    onPressed: () {
+                      final cardInfo = QrLinkParser.parse(widget.cardUrl);
+                      if (cardInfo != null) {
+                        Navigator.pop(context);
+                        context.push(
+                          '/public-card?ownerId=${cardInfo.ownerId}&cardId=${cardInfo.cardId}&source=nfc',
+                        );
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Hoàn Tất'),

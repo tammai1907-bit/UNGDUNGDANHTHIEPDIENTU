@@ -149,7 +149,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final ownerId = state.uri.queryParameters['ownerId'] ?? 'user_current';
           final cardId = state.uri.queryParameters['cardId'] ?? '';
-          return PublicCardScreen(ownerId: ownerId, cardId: cardId);
+          final source = state.uri.queryParameters['source'] ?? 'direct';
+          return PublicCardScreen(ownerId: ownerId, cardId: cardId, source: source);
         },
       ),
 
