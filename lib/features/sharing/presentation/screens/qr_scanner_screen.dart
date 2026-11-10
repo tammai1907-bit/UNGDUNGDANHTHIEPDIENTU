@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,7 +52,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     final cardInfo = QrLinkParser.parse(rawValue);
 
     if (cardInfo != null) {
-      // 1. Mở màn hình danh thiếp công khai của Thành viên 3 kèm tham số source=qr
+      // 1. Mở màn hình danh thiếp công khai kèm tham số source=qr
       context
           .push(
             '/public-card?ownerId=${cardInfo.ownerId}&cardId=${cardInfo.cardId}&source=qr',
@@ -72,7 +73,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mã QR đã quét'),
+        title: const Text('Mã QR Đã Quét'),
         content: Text('Nội dung quét được:\n\n$rawValue'),
         actions: [
           TextButton(
@@ -85,6 +86,40 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         ],
       ),
     );
+  }
+
+  Future<bool> _saveContactToDevice(SavedContact contact) async {
+    try {
+      final permission = await fc.FlutterContacts.requestPermission();
+      if (!permission) return false;
+
+      final newContact = fc.Contact();
+      final nameParts = contact.fullName.trim().split(' ');
+      if (nameParts.length > 1) {
+        newContact.name.last = nameParts.last;
+        newContact.name.first = nameParts.sublist(0, nameParts.length - 1).join(' ');
+      } else {
+        newContact.name.first = contact.fullName;
+      }
+
+      if (contact.company != null || contact.jobTitle != null) {
+        newContact.organizations.add(fc.Organization(
+          company: contact.company ?? '',
+          title: contact.jobTitle ?? '',
+        ));
+      }
+      if (contact.phone != null && contact.phone!.isNotEmpty) {
+        newContact.phones.add(fc.Phone(contact.phone!, label: fc.PhoneLabel.mobile));
+      }
+      if (contact.email != null && contact.email!.isNotEmpty) {
+        newContact.emails.add(fc.Email(contact.email!, label: fc.EmailLabel.work));
+      }
+
+      await newContact.insert();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _handleVCardScanned(String vcardText) {
@@ -142,9 +177,10 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: const Icon(Icons.bookmark_add_rounded),
-                label: const Text('Lưu Ngay Vào Ví Danh Bạ (CRM)'),
+                label: const Text('Lưu Vào Ví Danh Bạ (Ứng dụng)'),
                 onPressed: () async {
                   final result = await ref
                       .read(contactControllerProvider.notifier)
@@ -172,6 +208,34 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                       ),
                     );
                     context.go('/contacts');
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF16A34A)),
+                label: const Text('Lưu Trực Tiếp Vào Danh Bạ Máy'),
+                onPressed: () async {
+                  final ok = await _saveContactToDevice(parsedContact);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: ok ? const Color(0xFF16A34A) : Colors.red,
+                        content: Text(
+                          ok
+                              ? '✓ Đã lưu danh thiếp "${parsedContact.fullName}" vào Danh bạ điện thoại!'
+                              : 'Không thể lưu danh bạ. Vui lòng cấp quyền truy cập Danh bạ cho máy.',
+                        ),
+                      ),
+                    );
                   }
                 },
               ),
@@ -272,7 +336,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Text(
-                'Căn chỉnh mã QR của danh thiếp đối tác vào khung ngắm để tự động nhận và lưu vào Ví',
+                'Căn chỉnh mã QR của danh thiếp đối tác vào khung ngắm để tự động nhận và lưu',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 13),
               ),
