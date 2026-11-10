@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/validators/auth_validators.dart';
 import '../../../../core/widgets/app_snackbar.dart';
-import '../../../card_design/presentation/providers/card_repository_provider.dart' show useMockDataProvider;
-import '../../data/repositories/fake_auth_repository.dart';
 import '../providers/auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -16,8 +14,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController(text: 'tammai1907@gmail.com');
+  final _passwordController = TextEditingController(text: '12345');
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -26,14 +24,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _fillDemoAccount() {
-    setState(() {
-      _emailController.text = FakeAuthRepository.demoUser.email;
-      _passwordController.text = FakeAuthRepository.demoPassword;
-    });
-    AppSnackBar.showInfo(context, 'Đã điền tài khoản demo của Mai Văn Tâm');
   }
 
   Future<void> _handleLogin() async {
@@ -83,9 +73,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final useMock = ref.watch(useMockDataProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -139,49 +126,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 28),
-
-                  // Nút Điền tài khoản demo (Chế độ Mock)
-                  if (useMock) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFF1E88E5).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.bolt_rounded, color: Color(0xFF1E88E5), size: 24),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Chế độ Mock / Thử nghiệm',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  'tammai1907@gmail.com (Mai Văn Tâm)',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
-                          FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            onPressed: _fillDemoAccount,
-                            child: const Text('Điền demo', style: TextStyle(fontSize: 12)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
 
                   // Ô nhập Email
                   TextFormField(

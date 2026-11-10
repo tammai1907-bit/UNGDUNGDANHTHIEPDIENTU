@@ -65,9 +65,7 @@ class FakeAuthRepository implements AuthRepository {
                 (password == '12345' || password == '123456' || password == 'Password123')));
 
     if (!isMatch) {
-      return Result.failure(Exception(
-        'Email hoặc mật khẩu không chính xác! Vui lòng nhập đúng Email: tammai1907@gmail.com và Mật khẩu: 12345',
-      ));
+      return Result.failure(Exception('Email hoặc mật khẩu không chính xác'));
     }
 
     _currentUser = _users[normalizedEmail];
