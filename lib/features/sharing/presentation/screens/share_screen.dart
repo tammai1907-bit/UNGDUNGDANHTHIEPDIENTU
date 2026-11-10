@@ -15,6 +15,8 @@ import 'package:digital_business_card/features/card_design/presentation/provider
 import 'package:digital_business_card/features/sharing/utils/vcard_generator.dart';
 import 'nfc_exchange_screen.dart';
 
+enum QrCodeType { webUrl, vCard }
+
 class ShareScreen extends ConsumerStatefulWidget {
   const ShareScreen({super.key});
 
@@ -25,7 +27,9 @@ class ShareScreen extends ConsumerStatefulWidget {
 class _ShareScreenState extends ConsumerState<ShareScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
   String? _selectedCardId;
+  QrCodeType _qrType = QrCodeType.webUrl;
   bool _isSavingImage = false;
+  bool _isSavingContact = false;
 
   Future<void> _shareQrAsImage(BusinessCard card) async {
     setState(() => _isSavingImage = true);
@@ -71,6 +75,100 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     );
   }
 
+  void _showVCardOptionsModal(BusinessCard card) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.contact_phone_rounded, color: Color(0xFF16A34A)),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Xuất Danh Bạ Chuẩn vCard (.vcf)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Lưu trực tiếp vào điện thoại hoặc chia sẻ tệp',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Tùy chọn 1: Lưu trực tiếp vào danh bạ của điện thoại
+              ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                tileColor: Colors.grey.withValues(alpha: 0.08),
+                leading: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB)),
+                title: const Text('Lưu vào Danh bạ Điện thoại máy'),
+                subtitle: const Text('Tự động ghi thông tin vào ứng dụng Danh bạ của máy'),
+                trailing: _isSavingContact
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: _isSavingContact
+                    ? null
+                    : () async {
+                        setState(() => _isSavingContact = true);
+                        Navigator.pop(ctx);
+                        final success = await VCardGenerator.saveToDeviceContacts(card);
+                        if (!mounted) return;
+                        setState(() => _isSavingContact = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: success ? const Color(0xFF16A34A) : Colors.red,
+                            content: Text(
+                              success
+                                  ? '✓ Đã lưu danh thiếp "${card.fullName}" vào Danh bạ máy thành công!'
+                                  : 'Không thể lưu danh bạ. Vui lòng cấp quyền truy cập Danh bạ cho ứng dụng.',
+                            ),
+                          ),
+                        );
+                      },
+              ),
+
+              const SizedBox(height: 10),
+
+              // Tùy chọn 2: Chia sẻ file .vcf qua Zalo, Mail, v.v.
+              ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                tileColor: Colors.grey.withValues(alpha: 0.08),
+                leading: const Icon(Icons.share_outlined, color: Color(0xFF16A34A)),
+                title: const Text('Chia sẻ Tệp vCard (.vcf)'),
+                subtitle: const Text('Gửi file danh bạ qua Zalo, Messenger, Email, Bluetooth...'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  VCardGenerator.shareVCard(card);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cardsAsync = ref.watch(myCardsStreamProvider);
@@ -84,7 +182,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner_rounded),
-            tooltip: 'Quét mã QR',
+            tooltip: 'Quét mã QR đối tác',
             onPressed: () => context.push('/scan-qr'),
           ),
         ],
@@ -122,6 +220,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
             cardId: currentCard.id,
           );
 
+          final vcardData = VCardGenerator.generateVCardString(currentCard);
+          final qrData = _qrType == QrCodeType.webUrl ? shareUrl : vcardData;
+
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -130,7 +231,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 children: [
                   // Chọn thẻ nếu có nhiều hơn 1 thẻ
                   if (cards.length > 1) ...[
-                    const Text('Chọn danh thiếp cần chia sẻ:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                    const Text(
+                      'Chọn danh thiếp cần tạo mã QR:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -163,10 +267,34 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                   ],
 
-                  // Khung QR Code chụp được để lưu thành ảnh
+                  // Chuyển đổi loại QR Code (Link Web hoặc Danh Bạ vCard)
+                  Center(
+                    child: SegmentedButton<QrCodeType>(
+                      segments: const [
+                        ButtonSegment<QrCodeType>(
+                          value: QrCodeType.webUrl,
+                          icon: Icon(Icons.link_rounded, size: 16),
+                          label: Text('QR Link Web'),
+                        ),
+                        ButtonSegment<QrCodeType>(
+                          value: QrCodeType.vCard,
+                          icon: Icon(Icons.contact_page_rounded, size: 16),
+                          label: Text('QR vCard Danh Bạ'),
+                        ),
+                      ],
+                      selected: {_qrType},
+                      onSelectionChanged: (set) {
+                        setState(() => _qrType = set.first);
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Khung QR Code tự động sinh và chụp ảnh
                   Center(
                     child: Screenshot(
                       controller: _screenshotController,
@@ -188,7 +316,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           children: [
                             // Mã QR lớn
                             QrImageView(
-                              data: shareUrl,
+                              data: qrData,
                               version: QrVersions.auto,
                               size: 220.0,
                               gapless: true,
@@ -206,17 +334,39 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                                 currentCard.jobTitle,
                                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                               ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _qrType == QrCodeType.webUrl
+                                    ? const Color(0xFF2563EB).withValues(alpha: 0.1)
+                                    : const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _qrType == QrCodeType.webUrl
+                                    ? 'Quét để mở trang web danh thiếp'
+                                    : 'Quét để lưu thẳng vào danh bạ (Không cần mạng)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _qrType == QrCodeType.webUrl
+                                      ? const Color(0xFF2563EB)
+                                      : const Color(0xFF16A34A),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Đường dẫn chia sẻ
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.grey.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
@@ -241,16 +391,16 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
-                  // Nhóm các nút hành động
+                  // Nhóm các nút hành động chính
                   Row(
                     children: [
                       Expanded(
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
-                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           onPressed: () => _shareLink(shareUrl, currentCard.fullName),
@@ -262,7 +412,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           onPressed: _isSavingImage ? null : () => _shareQrAsImage(currentCard),
@@ -283,7 +433,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           onPressed: () {
@@ -298,18 +448,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             );
                           },
                           icon: const Icon(Icons.nfc_rounded, size: 18, color: Color(0xFFEA580C)),
-                          label: const Text('Chạm Ghi NFC'),
+                          label: const Text('Đọc / Ghi NFC'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          onPressed: () => VCardGenerator.shareVCard(currentCard),
-                          icon: const Icon(Icons.contact_page_outlined, size: 18, color: Color(0xFF16A34A)),
+                          onPressed: () => _showVCardOptionsModal(currentCard),
+                          icon: const Icon(Icons.contact_phone_outlined, size: 18, color: Color(0xFF16A34A)),
                           label: const Text('Xuất vCard'),
                         ),
                       ),
@@ -318,9 +468,12 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Nút quét QR nhanh
+                  // Nút quét QR camera nhanh
                   Center(
                     child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
                       onPressed: () => context.push('/scan-qr'),
                       icon: const Icon(Icons.camera_alt_outlined),
                       label: const Text('Quét mã QR của người khác'),

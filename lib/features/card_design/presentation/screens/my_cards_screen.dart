@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+import 'package:digital_business_card/config/app_constants.dart';
 import 'package:digital_business_card/core/constants/card_constants.dart';
 import 'package:digital_business_card/core/widgets/app_loading_shimmer.dart';
 import 'package:digital_business_card/core/widgets/app_snackbar.dart';
@@ -9,6 +12,7 @@ import 'package:digital_business_card/features/card_design/domain/entities/busin
 import 'package:digital_business_card/features/card_design/presentation/providers/card_list_controller.dart';
 import 'package:digital_business_card/features/card_design/presentation/providers/card_repository_provider.dart';
 import 'package:digital_business_card/features/card_design/presentation/widgets/card_preview.dart';
+import 'package:digital_business_card/features/sharing/utils/vcard_generator.dart';
 import 'card_editor_screen.dart';
 
 /// Màn hình "Danh sách thẻ của tôi" (My Cards Screen)
@@ -24,6 +28,116 @@ class MyCardsScreen extends ConsumerWidget {
         MaterialPageRoute(builder: (_) => CardEditorScreen(card: card)),
       );
     }
+  }
+
+  void _showCardQrDialog(BuildContext context, BusinessCard card) {
+    final shareUrl = AppConstants.buildCardShareUrl(
+      ownerId: card.ownerId.isNotEmpty ? card.ownerId : 'user_current',
+      cardId: card.id,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.qr_code_2_rounded, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 8),
+                  Text(
+                    card.cardName,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Text(
+                card.fullName,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: shareUrl,
+                  version: QrVersions.auto,
+                  size: 200,
+                  gapless: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Quét mã QR để xem và lưu danh thiếp',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.push('/share');
+                      },
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text('Chia Sẻ'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        VCardGenerator.shareVCard(card);
+                      },
+                      icon: const Icon(Icons.contact_phone_rounded, size: 18),
+                      label: const Text('Xuất vCard'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -240,11 +354,14 @@ class MyCardsScreen extends ConsumerWidget {
                   ),
                 ),
 
-                // Menu 3 chấm (Sửa, Nhân bản, Đặt mặc định, Xóa)
+                // Menu 3 chấm (Xem QR, Sửa, Nhân bản, Đặt mặc định, Xóa)
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (val) async {
                     switch (val) {
+                      case 'qr':
+                        _showCardQrDialog(context, card);
+                        break;
                       case 'edit':
                         _openEditor(context, card);
                         break;
@@ -295,6 +412,16 @@ class MyCardsScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'qr',
+                      child: Row(
+                        children: [
+                          Icon(Icons.qr_code_2_rounded, size: 20, color: Color(0xFF2563EB)),
+                          SizedBox(width: 10),
+                          Text('Xem mã QR'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'edit',
                       child: Row(
@@ -349,7 +476,49 @@ class MyCardsScreen extends ConsumerWidget {
             child: CardPreview(card: card, isInteractive: true),
           ),
 
-          const SizedBox(height: 12),
+          // Thanh nút tương tác nhanh bên dưới thẻ
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => _showCardQrDialog(context, card),
+                    icon: const Icon(Icons.qr_code_2_rounded, size: 18, color: Color(0xFF2563EB)),
+                    label: const Text('Mã QR', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => context.push('/share'),
+                    icon: const Icon(Icons.share_outlined, size: 18, color: Color(0xFF16A34A)),
+                    label: const Text('Chia Sẻ', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => _openEditor(context, card),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Sửa', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
