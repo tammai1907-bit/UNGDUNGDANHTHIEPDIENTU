@@ -43,7 +43,7 @@ extension CardTemplateTypeExtension on CardTemplateType {
 
 class AppConstants {
   /// Domain cấu hình duy nhất dùng cho liên kết danh thiếp trực tuyến và mã QR
-  static const String cardBaseDomain = 'https://card.antigravity.dev';
+  static const String cardBaseDomain = 'https://card.maitam1907.dev';
 
   /// Sinh đường dẫn xem danh thiếp công khai theo chuẩn: `https://<domain>/c/{ownerId}/{cardId}`
   static String buildCardShareUrl({required String ownerId, required String cardId}) {

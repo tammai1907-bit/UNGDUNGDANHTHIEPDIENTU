@@ -31,7 +31,7 @@ class QrLinkParser {
     try {
       final uri = Uri.parse(trimmed);
 
-      // Định dạng chuẩn: https://card.antigravity.dev/c/{ownerId}/{cardId}
+      // Định dạng chuẩn: https://card.maitam1907.dev/c/{ownerId}/{cardId}
       // hoặc bất kỳ host nào có path dạng /c/{ownerId}/{cardId}
       final segments = uri.pathSegments;
       if (segments.length >= 3 && segments[0] == 'c') {

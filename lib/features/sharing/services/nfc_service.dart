@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:digital_business_card/config/app_constants.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 
 enum NfcSessionState {
@@ -262,7 +263,7 @@ class NfcService {
     await Future.delayed(const Duration(milliseconds: 1000));
 
     final samplePayload =
-        mockPayload ?? 'https://card.antigravity.dev/c/mock_user_1/mock_card_1';
+        mockPayload ?? AppConstants.buildCardShareUrl(ownerId: 'mock_user_1', cardId: 'mock_card_1');
     onResult(
       NfcSessionState.success,
       samplePayload,
