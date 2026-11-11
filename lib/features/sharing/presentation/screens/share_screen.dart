@@ -9,16 +9,21 @@ import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:digital_business_card/config/app_constants.dart';
+import 'package:digital_business_card/features/analytics/presentation/providers/analytics_providers.dart';
 import 'package:digital_business_card/features/auth/presentation/providers/auth_providers.dart';
 import 'package:digital_business_card/features/card_design/domain/entities/business_card.dart';
 import 'package:digital_business_card/features/card_design/presentation/providers/card_list_controller.dart';
+import 'package:digital_business_card/features/sharing/presentation/widgets/share_options_bottom_sheet.dart';
+import 'package:digital_business_card/features/sharing/services/gallery_saver_service.dart';
 import 'package:digital_business_card/features/sharing/utils/vcard_generator.dart';
 import 'nfc_exchange_screen.dart';
 
 enum QrCodeType { webUrl, vCard }
 
 class ShareScreen extends ConsumerStatefulWidget {
-  const ShareScreen({super.key});
+  final Future<Uint8List?> Function()? captureQrOverride;
+
+  const ShareScreen({super.key, this.captureQrOverride});
 
   @override
   ConsumerState<ShareScreen> createState() => _ShareScreenState();
@@ -31,10 +36,67 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   bool _isSavingImage = false;
   bool _isSavingContact = false;
 
-  Future<void> _shareQrAsImage(BusinessCard card) async {
+  Future<Uint8List?> _captureQrImageBytes() {
+    if (widget.captureQrOverride != null) {
+      return widget.captureQrOverride!();
+    }
+    return _screenshotController.capture(
+      delay: const Duration(milliseconds: 80),
+      pixelRatio: 3.0,
+    );
+  }
+
+  /// Lưu thẳng ảnh mã QR vào thư viện Photo của điện thoại
+  Future<void> _saveQrToPhotos(BusinessCard card) async {
     setState(() => _isSavingImage = true);
     try {
-      final imageBytes = await _screenshotController.capture();
+      final imageBytes = await _captureQrImageBytes();
+      if (imageBytes == null) {
+        throw Exception('Không thể chụp ảnh mã QR');
+      }
+
+      final fileName =
+          'QR_${card.id}_${DateTime.now().millisecondsSinceEpoch}.png';
+      await GallerySaverService.saveQrImage(imageBytes, fileName: fileName);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Đã lưu về photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            content: Text('Lỗi khi lưu ảnh QR: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingImage = false);
+    }
+  }
+
+  /// Chia sẻ file ảnh mã QR qua ứng dụng khác
+  Future<void> _shareQrAsImageFile(BusinessCard card) async {
+    setState(() => _isSavingImage = true);
+    try {
+      final imageBytes = await _captureQrImageBytes();
       if (imageBytes != null) {
         final tempDir = await getTemporaryDirectory();
         final file = File('${tempDir.path}/qr_${card.id}.png');
@@ -43,13 +105,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         await Share.shareXFiles(
           [XFile(file.path, mimeType: 'image/png')],
           subject: 'Mã QR Danh thiếp: ${card.fullName}',
-          text: 'Quét mã QR này để kết nối với ${card.fullName} (${card.jobTitle})',
+          text:
+              'Quét mã QR này để kết nối với ${card.fullName} (${card.jobTitle})',
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi lưu ảnh QR: $e')),
+          SnackBar(content: Text('Lỗi khi chia sẻ ảnh QR: $e')),
         );
       }
     } finally {
@@ -68,10 +131,35 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     );
   }
 
-  void _shareLink(String url, String name) {
-    Share.share(
-      'Xem và lưu danh thiếp điện tử của $name tại: $url',
-      subject: 'Danh thiếp điện tử - $name',
+  void _recordShareEvent(String cardId, String platform) {
+    ref.read(analyticsRepositoryProvider).recordEvent(
+          cardId: cardId,
+          eventType: 'link_click',
+          linkType: platform,
+        );
+  }
+
+  void _openShareSheet(BusinessCard card, String shareUrl) {
+    showShareOptionsBottomSheet(
+      context,
+      card: card,
+      shareUrl: shareUrl,
+      onShareQrImage: () => _shareQrAsImageFile(card),
+      onSharedEvent: (platform) => _recordShareEvent(card.id, platform),
+    );
+  }
+
+  Future<void> _shareDirectPlatform(
+    BusinessCard card,
+    String shareUrl,
+    SharePlatformType platform,
+  ) {
+    return ShareOptionsBottomSheet.shareViaPlatform(
+      context,
+      platform: platform,
+      card: card,
+      shareUrl: shareUrl,
+      onSharedEvent: (p) => _recordShareEvent(card.id, p),
     );
   }
 
@@ -96,21 +184,29 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       color: const Color(0xFF16A34A).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.contact_phone_rounded, color: Color(0xFF16A34A)),
+                    child: const Icon(
+                      Icons.contact_phone_rounded,
+                      color: Color(0xFF16A34A),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Xuất Danh Bạ Chuẩn vCard (.vcf)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      Text(
-                        'Lưu trực tiếp vào điện thoại hoặc chia sẻ tệp',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Xuất Danh Bạ Chuẩn vCard (.vcf)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'Lưu trực tiếp vào điện thoại hoặc chia sẻ tệp',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -118,28 +214,41 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
               // Tùy chọn 1: Lưu trực tiếp vào danh bạ của điện thoại
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 tileColor: Colors.grey.withValues(alpha: 0.08),
-                leading: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB)),
-                title: const Text('Lưu vào Danh bạ Điện thoại máy'),
-                subtitle: const Text('Tự động ghi thông tin vào ứng dụng Danh bạ của máy'),
+                leading: const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  color: Color(0xFF2563EB),
+                ),
+                title: const Text('Lưu vào Danh bạ điện thoại'),
+                subtitle: const Text(
+                  'Tự động ghi thông tin vào ứng dụng Danh bạ của máy',
+                ),
                 trailing: _isSavingContact
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: _isSavingContact
                     ? null
                     : () async {
                         setState(() => _isSavingContact = true);
                         Navigator.pop(ctx);
-                        final success = await VCardGenerator.saveToDeviceContacts(card);
+                        final success =
+                            await VCardGenerator.saveToDeviceContacts(card);
                         if (!mounted) return;
                         setState(() => _isSavingContact = false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            backgroundColor: success ? const Color(0xFF16A34A) : Colors.red,
+                            backgroundColor:
+                                success ? const Color(0xFF16A34A) : Colors.red,
                             content: Text(
                               success
-                                  ? '✓ Đã lưu danh thiếp "${card.fullName}" vào Danh bạ máy thành công!'
+                                  ? '✓ Đã lưu danh thiếp "${card.fullName}" vào Danh bạ điện thoại!'
                                   : 'Không thể lưu danh bạ. Vui lòng cấp quyền truy cập Danh bạ cho ứng dụng.',
                             ),
                           ),
@@ -151,11 +260,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
               // Tùy chọn 2: Chia sẻ file .vcf qua Zalo, Mail, v.v.
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 tileColor: Colors.grey.withValues(alpha: 0.08),
-                leading: const Icon(Icons.share_outlined, color: Color(0xFF16A34A)),
+                leading: const Icon(
+                  Icons.share_outlined,
+                  color: Color(0xFF16A34A),
+                ),
                 title: const Text('Chia sẻ Tệp vCard (.vcf)'),
-                subtitle: const Text('Gửi file danh bạ qua Zalo, Messenger, Email, Bluetooth...'),
+                subtitle: const Text(
+                  'Gửi file danh bạ qua Zalo, Messenger, Email, Bluetooth...',
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -196,9 +312,16 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.credit_card_off_outlined, size: 64, color: Colors.grey),
+                  const Icon(
+                    Icons.credit_card_off_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
-                  const Text('Bạn chưa có danh thiếp nào để chia sẻ', style: TextStyle(fontSize: 16)),
+                  const Text(
+                    'Bạn chưa có danh thiếp nào để chia sẻ',
+                    style: TextStyle(fontSize: 16),
+                  ),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => context.push('/create-card'),
@@ -212,7 +335,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
           // Lấy thẻ đang chọn
           final currentCard = cards.firstWhere(
             (c) => c.id == _selectedCardId,
-            orElse: () => cards.firstWhere((c) => c.isDefault, orElse: () => cards.first),
+            orElse: () =>
+                cards.firstWhere((c) => c.isDefault, orElse: () => cards.first),
           );
 
           final shareUrl = AppConstants.buildCardShareUrl(
@@ -233,7 +357,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                   if (cards.length > 1) ...[
                     const Text(
                       'Chọn danh thiếp cần tạo mã QR:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -241,7 +369,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       decoration: BoxDecoration(
                         color: Colors.grey.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.grey.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -252,9 +382,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                               value: c.id,
                               child: Row(
                                 children: [
-                                  Icon(c.isDefault ? Icons.star : Icons.credit_card, size: 18, color: const Color(0xFF2563EB)),
+                                  Icon(
+                                    c.isDefault
+                                        ? Icons.star
+                                        : Icons.credit_card,
+                                    size: 18,
+                                    color: const Color(0xFF2563EB),
+                                  ),
                                   const SizedBox(width: 8),
-                                  Text(c.cardName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Text(
+                                    c.cardName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
@@ -327,20 +468,32 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                             const SizedBox(height: 12),
                             Text(
                               currentCard.fullName,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
                             if (currentCard.jobTitle.isNotEmpty)
                               Text(
                                 currentCard.jobTitle,
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF64748B),
+                                ),
                               ),
                             const SizedBox(height: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: _qrType == QrCodeType.webUrl
-                                    ? const Color(0xFF2563EB).withValues(alpha: 0.1)
-                                    : const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                    ? const Color(0xFF2563EB)
+                                        .withValues(alpha: 0.1)
+                                    : const Color(0xFF16A34A)
+                                        .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -366,19 +519,27 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
                   // Đường dẫn chia sẻ
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.grey.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.link, size: 20, color: Color(0xFF2563EB)),
+                        const Icon(
+                          Icons.link,
+                          size: 20,
+                          color: Color(0xFF2563EB),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             shareUrl,
-                            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -401,9 +562,12 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
-                          onPressed: () => _shareLink(shareUrl, currentCard.fullName),
+                          onPressed: () =>
+                              _openShareSheet(currentCard, shareUrl),
                           icon: const Icon(Icons.share_outlined, size: 18),
                           label: const Text('Chia Sẻ Link'),
                         ),
@@ -413,11 +577,21 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
-                          onPressed: _isSavingImage ? null : () => _shareQrAsImage(currentCard),
+                          onPressed: _isSavingImage
+                              ? null
+                              : () => _saveQrToPhotos(currentCard),
                           icon: _isSavingImage
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : const Icon(Icons.image_outlined, size: 18),
                           label: const Text('Lưu Ảnh QR'),
                         ),
@@ -434,7 +608,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -447,7 +623,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.nfc_rounded, size: 18, color: Color(0xFFEA580C)),
+                          icon: const Icon(
+                            Icons.nfc_rounded,
+                            size: 18,
+                            color: Color(0xFFEA580C),
+                          ),
                           label: const Text('Đọc / Ghi NFC'),
                         ),
                       ),
@@ -456,23 +636,95 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           onPressed: () => _showVCardOptionsModal(currentCard),
-                          icon: const Icon(Icons.contact_phone_outlined, size: 18, color: Color(0xFF16A34A)),
+                          icon: const Icon(
+                            Icons.contact_phone_outlined,
+                            size: 18,
+                            color: Color(0xFF16A34A),
+                          ),
                           label: const Text('Xuất vCard'),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
+
+                  // Dải ứng dụng chia sẻ nhanh phổ biến
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.grey.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Chia sẻ nhanh qua ứng dụng',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final platform in const [
+                                SharePlatformType.messenger,
+                                SharePlatformType.zalo,
+                                SharePlatformType.facebook,
+                                SharePlatformType.instagram,
+                                SharePlatformType.tiktok,
+                                SharePlatformType.telegram,
+                              ])
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 10),
+                                  child: _QuickShareAppTile(
+                                    platform: platform,
+                                    onTap: () => _shareDirectPlatform(
+                                      currentCard,
+                                      shareUrl,
+                                      platform,
+                                    ),
+                                  ),
+                                ),
+                              _QuickShareAppTile(
+                                platform: SharePlatformType.system,
+                                customLabel: 'Xem thêm',
+                                onTap: () =>
+                                    _openShareSheet(currentCard, shareUrl),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
 
                   // Nút quét QR camera nhanh
                   Center(
                     child: TextButton.icon(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                       onPressed: () => context.push('/scan-qr'),
                       icon: const Icon(Icons.camera_alt_outlined),
@@ -484,6 +736,46 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _QuickShareAppTile extends StatelessWidget {
+  final SharePlatformType platform;
+  final String? customLabel;
+  final VoidCallback onTap;
+
+  const _QuickShareAppTile({
+    required this.platform,
+    this.customLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 58,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SharePlatformIconBadge(platform: platform, size: 42),
+              const SizedBox(height: 5),
+              Text(
+                customLabel ?? platform.label,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -3,8 +3,8 @@ import 'package:digital_business_card/features/sharing/utils/qr_link_parser.dart
 
 void main() {
   group('QrLinkParser Tests', () {
-    test('Phân tích đúng URL chuẩn https://card.antigravity.dev/c/{ownerId}/{cardId}', () {
-      const url = 'https://card.antigravity.dev/c/user_current/card_official_01';
+    test('Phân tích đúng URL chuẩn https://card.maitam1907.dev/c/{ownerId}/{cardId}', () {
+      const url = 'https://card.maitam1907.dev/c/user_current/card_official_01';
       final info = QrLinkParser.parse(url);
 
       expect(info, isNotNull);
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('isValidCardUrl hoạt động chính xác', () {
-      expect(QrLinkParser.isValidCardUrl('https://card.antigravity.dev/c/usr/card'), isTrue);
+      expect(QrLinkParser.isValidCardUrl('https://card.maitam1907.dev/c/usr/card'), isTrue);
       expect(QrLinkParser.isValidCardUrl('https://facebook.com'), isFalse);
     });
   });
